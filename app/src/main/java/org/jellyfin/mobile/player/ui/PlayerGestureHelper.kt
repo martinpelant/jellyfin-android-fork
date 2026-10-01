@@ -451,6 +451,25 @@ class PlayerGestureHelper(
         playerView.resizeMode = if (enabled) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
     }
 
+    fun onScrollWheel(isUp: Boolean) {
+        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val delta = if (isUp) 1 else -1
+        val newVolume = (currentVolume + delta).coerceIn(0, maxVolume)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, newVolume, 0)
+
+        gestureIndicatorOverlayImage.setImageResource(R.drawable.ic_volume_white_24dp)
+        gestureIndicatorOverlayProgress.max = maxVolume
+        gestureIndicatorOverlayProgress.progress = newVolume
+        gestureIndicatorOverlayLayout.isVisible = true
+
+        gestureIndicatorOverlayLayout.removeCallbacks(hideGestureIndicatorOverlayAction)
+        gestureIndicatorOverlayLayout.postDelayed(
+            hideGestureIndicatorOverlayAction,
+            Constants.DEFAULT_CENTER_OVERLAY_TIMEOUT_MS.toLong(),
+        )
+    }
+
     /**
      * Format time in milliseconds to mm:ss or h:mm:ss format
      */

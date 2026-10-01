@@ -413,6 +413,15 @@ class PlayerMenus(
         playbackInfo.isVisible = false
     }
 
+    fun dismissAllMenus() {
+        audioStreamsMenu.dismiss()
+        subtitlesMenu.dismiss()
+        speedMenu.dismiss()
+        qualityMenu.dismiss()
+        decoderMenu.dismiss()
+        isAnyMenuShowing = false
+    }
+
     override fun onDismiss(menu: PopupMenu) {
         isAnyMenuShowing = false
         fragment.suppressControllerAutoHide(false)

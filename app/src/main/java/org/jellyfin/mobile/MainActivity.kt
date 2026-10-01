@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.OrientationEventListener
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -30,6 +31,7 @@ import org.jellyfin.mobile.player.ui.PlayerFragment
 import org.jellyfin.mobile.setup.ConnectFragment
 import org.jellyfin.mobile.utils.AndroidVersion
 import org.jellyfin.mobile.utils.BackPressInterceptor
+import org.jellyfin.mobile.utils.GenericMotionInterceptor
 import org.jellyfin.mobile.utils.KeyEventInterceptor
 import org.jellyfin.mobile.utils.BluetoothPermissionHelper
 import org.jellyfin.mobile.utils.Constants
@@ -206,6 +208,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+        if (currentFragment is GenericMotionInterceptor && currentFragment.onInterceptGenericMotionEvent(event)) {
+            return true
+        }
+        for (fragment in supportFragmentManager.fragments) {
+            if (fragment !== currentFragment && fragment is GenericMotionInterceptor && fragment.isVisible) {
+                if (fragment.onInterceptGenericMotionEvent(event)) {
+                    return true
+                }
+            }
+        }
+        return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onUserLeaveHint() {

@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.OrientationEventListener
 import android.view.View
 import android.view.ViewGroup
@@ -47,6 +48,7 @@ import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.Constants.DEFAULT_CONTROLS_TIMEOUT_MS
 import org.jellyfin.mobile.utils.Constants.PIP_MAX_RATIONAL
 import org.jellyfin.mobile.utils.Constants.PIP_MIN_RATIONAL
+import org.jellyfin.mobile.utils.GenericMotionInterceptor
 import org.jellyfin.mobile.utils.KeyEventInterceptor
 import org.jellyfin.mobile.utils.SmartOrientationListener
 import org.jellyfin.mobile.utils.brightness
@@ -61,8 +63,8 @@ import org.koin.android.ext.android.inject
 import kotlin.math.max
 import androidx.media3.ui.R as Media3R
 
-@Suppress("TooManyFunctions")
-class PlayerFragment : Fragment(), BackPressInterceptor, KeyEventInterceptor {
+@Suppress("TooManyFunctions", "ClickableViewAccessibility")
+class PlayerFragment : Fragment(), BackPressInterceptor, KeyEventInterceptor, GenericMotionInterceptor {
     private val appPreferences: AppPreferences by inject()
     private val assHandler: AssHandler by inject()
     private val viewModel: PlayerViewModel by viewModels()
@@ -229,6 +231,30 @@ class PlayerFragment : Fragment(), BackPressInterceptor, KeyEventInterceptor {
         fullscreenSwitcher.setOnClickListener {
             toggleFullscreen()
         }
+
+        // Prevent click/touch pass-through to background fragments and improve mouse support
+        playerBinding.root.setOnTouchListener { _, _ -> true }
+        playerControlsBinding.root.setOnClickListener {
+            playerView.hideController()
+        }
+        toolbar.isClickable = true
+        playerControlsBinding.seekBarContainer.isClickable = true
+
+        val genericMotionListener = View.OnGenericMotionListener { _, event ->
+            onInterceptGenericMotionEvent(event)
+        }
+        val hoverListener = View.OnHoverListener { _, event ->
+            onInterceptGenericMotionEvent(event)
+        }
+        playerBinding.root.setOnGenericMotionListener(genericMotionListener)
+        playerBinding.root.setOnHoverListener(hoverListener)
+        playerView.setOnGenericMotionListener(genericMotionListener)
+        playerView.setOnHoverListener(hoverListener)
+        playerControlsBinding.root.setOnGenericMotionListener(genericMotionListener)
+        playerControlsBinding.root.setOnHoverListener(hoverListener)
+
+        playerBinding.root.isFocusableInTouchMode = true
+        playerBinding.root.requestFocus()
     }
 
     override fun onStart() {
@@ -506,6 +532,52 @@ class PlayerFragment : Fragment(), BackPressInterceptor, KeyEventInterceptor {
                 }
                 true
             }
+            else -> false
+        }
+    }
+
+    override fun onInterceptGenericMotionEvent(event: MotionEvent): Boolean {
+        if (!playerView.useController) {
+            if (event.action == MotionEvent.ACTION_BUTTON_PRESS) {
+                playerLockScreenHelper.peekUnlockButton()
+            }
+            return true
+        }
+
+        if (playerMenus?.isAnyMenuShowing == true) {
+            if (event.action == MotionEvent.ACTION_BUTTON_PRESS) {
+                playerMenus?.dismissAllMenus()
+            }
+            return true
+        }
+
+        return when (event.action) {
+            MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_HOVER_ENTER -> {
+                playerView.showController()
+                true
+            }
+            MotionEvent.ACTION_HOVER_EXIT -> true
+            MotionEvent.ACTION_SCROLL -> {
+                val vscroll = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+                if (vscroll != 0f) {
+                    playerGestureHelper.onScrollWheel(vscroll > 0)
+                }
+                true
+            }
+            MotionEvent.ACTION_BUTTON_PRESS -> {
+                val buttonState = event.buttonState
+                if ((buttonState and MotionEvent.BUTTON_SECONDARY) != 0) {
+                    if (playerView.isControllerFullyVisible) {
+                        playerView.hideController()
+                    } else {
+                        playerView.showController()
+                    }
+                } else if ((buttonState and MotionEvent.BUTTON_BACK) != 0) {
+                    parentFragmentManager.popBackStack()
+                }
+                true
+            }
+            MotionEvent.ACTION_BUTTON_RELEASE -> true
             else -> false
         }
     }
